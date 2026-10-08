@@ -1,0 +1,61 @@
+#include <DHT.h>
+#include <HX711.h>
+#define DHTPIN 7
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+#define DT 2
+#define SCK 3
+HX711 scale;
+#define TRIG 4
+#define ECHO 5
+#define LED_PIN 8
+#define BUZZER_PIN 6
+float initialWeight = 0;
+float initialDistance = 0;
+bool movementStarted = false;
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  scale.begin(DT, SCK);
+  scale.set_scale(2280.0);
+  scale.tare();
+  delay(2000);
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  initialWeight = scale.get_units(10);
+  initialDistance = readDistance();
+  Serial.println("System Started");
+}
+void loop() {
+  float currentDistance = readDistance();
+  float currentWeight = scale.get_units(5);
+  float temp = dht.readTemperature();
+  Serial.print("Weight: "); Serial.print(currentWeight);
+  Serial.print(" | Temp: "); Serial.println(temp);
+  if (!movementStarted && abs(currentDistance - initialDistance) > 2) {
+    movementStarted = true;
+    Serial.println("Movement Detected - Transport Started");
+  }
+  if (movementStarted) {
+    if (abs(initialWeight - currentWeight) > 1.0) {
+      Serial.println("ALERT: Medicine Theft Detected!");
+      digitalWrite(LED_PIN, HIGH); digitalWrite(BUZZER_PIN, HIGH);
+    } else {
+      digitalWrite(LED_PIN, LOW); digitalWrite(BUZZER_PIN, LOW);
+    }
+    if (temp > 30) {
+      Serial.println("ALERT: Temperature High - Medicine Spoilage Risk!");
+      digitalWrite(BUZZER_PIN, HIGH);
+    }
+  }
+  delay(2000);
+}
+float readDistance() {
+  digitalWrite(TRIG, LOW); delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  float duration = pulseIn(ECHO, HIGH);
+  return duration * 0.034 / 2;
+}
